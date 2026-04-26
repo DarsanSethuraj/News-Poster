@@ -64,7 +64,19 @@ def FetchTitleAndPara(url: str = Query(...)):
     if content_container:
         paragraphs = content_container.find_all("p")
     else:
-        paragraphs = soup.find_all("p")    
+        paragraphs = soup.find_all("p")  
+
+    # CREATE THE BANNED PHRASES IN LOWERCASE
+    banned_phrases = [
+    "advertisement",
+    "read more",
+    "categories:",
+    "tags:",
+    "share this:",
+    "related articles",
+    "uncategorized",
+    "listen to the latest"
+    ] 
 
     content=""
     # for eg: paragraph = [<p>First</p>, <p>Second</p>]
@@ -80,10 +92,7 @@ def FetchTitleAndPara(url: str = Query(...)):
         if len(text) < 10:
             continue
         
-        if "advertisement" in text.lower():
-            continue
-    
-        if "read more" in text.lower():
+        if any(phrase in text.lower() for phrase in banned_phrases):
             continue
     
         content += f"<p>{text}</p>"
