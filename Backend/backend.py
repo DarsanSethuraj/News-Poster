@@ -82,6 +82,10 @@ def FetchTitleAndPara(url: str = Query(...)):
     # for eg: paragraph = [<p>First</p>, <p>Second</p>]
     for para in paragraphs:   
 
+        # to remove image captions
+        if para.find_parent(["figure", "figcaption"]):
+            continue
+
         # gets the content inside the HTML tags
         text = para.get_text(strip=True)
 
