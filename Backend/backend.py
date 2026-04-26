@@ -37,12 +37,12 @@ def FetchTitleAndPara(url: str = Query(...)):
     # converts HTML into a structured data
     soup=BeautifulSoup(res.text,'html.parser')          
 
-    # if title tag exists in the html
-    if soup.title:     
-        # stores the only the text inside the title tag, if anything other than simple sentences are present then it returns None     
-        title=soup.title.string         
-    else:                   
-        title="No Title"
+    if soup.find("h1"):
+        title = soup.find("h1").get_text(strip=True)
+    elif soup.title:
+        title = soup.title.get_text(strip=True)
+    else:
+        title = "No Title"
 
     # order in terms of priority (contents are mostly in one such tag) 
     possible_containers = [
