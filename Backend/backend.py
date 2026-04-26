@@ -43,9 +43,26 @@ def FetchTitleAndPara(url: str = Query(...)):
         title=soup.title.string         
     else:                   
         title="No Title"
+
+    # order in terms of priority (contents are mostly in one such tag) 
+    possible_containers = [
+    soup.find("article"),
+    soup.find("main"),
+    soup.find("div", class_="article-body"),
+    soup.find("div", class_="post-content"),
+    soup.find("div", class_="entry-content")]
     
-    # stores everything inside the <p> tag and inludes the tag itself too -> this will find each and every <p> and store it
-    paragraphs=soup.find_all("p")       
+    content_container = None
+    
+    for container in possible_containers:
+        if container:
+            content_container = container
+            break
+    
+    if content_container:
+        paragraphs = content_container.find_all("p")
+    else:
+        paragraphs = soup.find_all("p")    
 
     content=""
     # for eg: paragraph = [<p>First</p>, <p>Second</p>]
