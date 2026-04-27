@@ -39,11 +39,17 @@ def test():
 def FetchTitleAndPara(url: str = Query(...)):         
 
     # so that websites don't block my request thinking its bot
-    headers = {"User-Agent": "Mozilla/5.0"} 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.google.com/"
+    }
     
     try:
         # fetches the html of the given url & stops fetching when the timeout seconds is reached
         res = requests.get(url, headers=headers, timeout=5)
+    
+    
 
     # proceeds only if the error is caused by Timeout, ConnectionError, HTTPError etc
     except requests.exceptions.RequestException:
@@ -52,13 +58,14 @@ def FetchTitleAndPara(url: str = Query(...)):
             res = requests.get(url, headers=headers, timeout=5)
         except requests.exceptions.RequestException:
             return {"error": "Request failed twice"}
-        
+    
     # 200 is for success
     if res.status_code != 200:          
         return {"error": "Failed to fetch page"}
     
     # converts HTML into a structured data
-    soup=BeautifulSoup(res.text,'html.parser')          
+    soup=BeautifulSoup(res.text,'html.parser')  
+      
 
     # for getting title of the news
     if soup.find("h1"):
@@ -102,21 +109,41 @@ def FetchTitleAndPara(url: str = Query(...)):
     else:
         paragraphs = soup.find_all("p")  
 
+    
+
     # CREATE THE BANNED PHRASES IN LOWERCASE
-    banned_phrases = [
-    "advertisement",
-    "read more",
-    "categories:",
-    "tags:",
-    "share this:",
-    "related articles",
-    "uncategorized",
-    "listen to the latest",
-    "additional reporting by",
-    "sign up here",
-    "our newsletter",
-    "royal watch newsletter"
+    GLOBAL_BANNED_PHRASES = [
+        "advertisement",
+        "read more",
+        "categories:",
+        "tags:",
+        "share this:",
+        "related articles",
+        "uncategorized",
+        "listen to the latest",
+        "additional reporting by",
+        "sign up here",
+        "our newsletter",
+        "royal watch newsletter",
     ] 
+
+    ASIANET_BANNED_PHRASES = [
+        "asianet news",
+        "malayalam news"
+    ]
+
+    MANORAMA_BANNED_PHRASES = [
+        "ago"
+    ]
+
+    banned_phrases=GLOBAL_BANNED_PHRASES.copy()
+    
+    if "asianetnews.com" in url:
+        banned_phrases.extend(ASIANET_BANNED_PHRASES)
+
+    elif "manoramaonline.com" in url:
+        banned_phrases.extend(MANORAMA_BANNED_PHRASES)
+
 
     content=""
     # for eg: paragraph = [<p>First</p>, <p>Second</p>]
@@ -136,8 +163,11 @@ def FetchTitleAndPara(url: str = Query(...)):
         #if para has less than 10 characters
         if len(text) < 10:
             continue
+
+        lower_text = text.lower()
         
-        if any(phrase in text.lower() for phrase in banned_phrases):
+
+        if any(phrase in lower_text for phrase in banned_phrases):
             continue
     
         content += f"<p>{text}</p>"
