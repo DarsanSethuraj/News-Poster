@@ -41,12 +41,20 @@ function backend_test(string $url){
         ];
     }
 
+    # if post is not created, then it returns a WP Error due to the 'true'
     $post_id = wp_insert_post([
         'post_title'   => $data['title'],
         'post_content' => $data['content'],
         'post_status'  => 'publish',
         'post_author'  => 1,
-    ]);
+    ],true);
+
+    if (is_wp_error($post_id)) {
+        return [
+            'message' => 'Failed to create post.',
+            'post_url' => null
+        ];
+    }
 
     # for inserting image into the gallery & associating it with the post
     if (!empty($data['image_url'])) {
@@ -129,10 +137,11 @@ function backend_page_html() {
         $notice_class = 'notice-success'; # success gives green color (WP style)
 
         if (
-            $result['message'] === 'Backend request failed.' ||
-            $result['message'] === 'Failed to fetch article.' ||
-            $result['message'] === 'Please enter a valid URL.' ||
-            $result['message'] === 'Security check failed.'
+            $message === 'Backend request failed.' ||
+            $message === 'Failed to fetch article.' ||
+            $message === 'Please enter a valid URL.' ||
+            $message === 'Security check failed.' ||
+            $message === 'Failed to create post.'
         ) {
             $notice_class = 'notice-error'; # gives red color to the msg
         }
@@ -140,7 +149,7 @@ function backend_page_html() {
         echo '<div class="notice ' . $notice_class . ' is-dismissible">'; # is-dismissible => for option to close the msg
         
         # removes formatting (for safer future uses if code changes)
-        echo '<p>' . esc_html($result['message']) . '</p>';
+        echo '<p>' . esc_html($message) . '</p>';
         echo '</div>';
         if ($post_url) {
             echo '<p>';
