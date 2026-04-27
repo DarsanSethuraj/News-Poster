@@ -7,12 +7,19 @@ function backend_test(string $url){
 
     # post_exists function is not automatically available, so we manually add it
     require_once ABSPATH . 'wp-admin/includes/post.php';
+    # for setting feautured image functions
+    require_once ABSPATH . 'wp-admin/includes/media.php';
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/image.php';
 
     # fetches a complicated array containing Status code, Headers, Body, Other metadata etc.
     $response = wp_remote_get("http://127.0.0.1:8000/news?url=".urlencode($url));
     
     if (is_wp_error($response)) {
-        return "Backend request failed.";
+        return [
+            'message' => 'Backend request failed.',
+            'post_url' => null
+        ];
     }
 
     # Converts a JSON string into a PHP Array
@@ -21,21 +28,44 @@ function backend_test(string $url){
     $data = json_decode(wp_remote_retrieve_body($response),true);
 
     if (empty($data['title']) || empty($data['content'])) {
-        return "Failed to fetch article.";
+        return [
+            'message' => 'Failed to fetch article.',
+            'post_url' => null
+        ];
     }
 
     if (post_exists($data['title'])) {
-        return "Post already exists.";
+        return [
+            'message' => 'Post already exists.',
+            'post_url' => null
+        ];
     }
 
-    wp_insert_post([
+    $post_id = wp_insert_post([
         'post_title'   => $data['title'],
         'post_content' => $data['content'],
         'post_status'  => 'publish',
         'post_author'  => 1,
     ]);
 
-    return "Post created successfully!";
+    # for inserting image into the gallery & associating it with the post
+    if (!empty($data['image_url'])) {
+        $image_id = media_sideload_image(
+            $data['image_url'],
+            $post_id,
+            null,
+            'id'
+        );
+        # sets it as featured image of the post
+        if (!is_wp_error($image_id)) {
+            set_post_thumbnail($post_id, $image_id);
+        }
+    }
+
+    return [
+        'message' => 'Post created successfully!',
+        'post_url' => get_permalink($post_id)
+    ];
 
 
 }
@@ -92,15 +122,17 @@ function backend_page_html() {
             echo "<p>Please enter a valid URL.</p>";
             return;
         }
-        $message = backend_test($url);
+        $result = backend_test($url);
+        $message = $result['message'];
+        $post_url = $result['post_url'];
 
         $notice_class = 'notice-success'; # success gives green color (WP style)
 
         if (
-            $message === 'Backend request failed.' ||
-            $message === 'Failed to fetch article.' ||
-            $message === 'Please enter a valid URL.' ||
-            $message === 'Security check failed.'
+            $result['message'] === 'Backend request failed.' ||
+            $result['message'] === 'Failed to fetch article.' ||
+            $result['message'] === 'Please enter a valid URL.' ||
+            $result['message'] === 'Security check failed.'
         ) {
             $notice_class = 'notice-error'; # gives red color to the msg
         }
@@ -108,8 +140,15 @@ function backend_page_html() {
         echo '<div class="notice ' . $notice_class . ' is-dismissible">'; # is-dismissible => for option to close the msg
         
         # removes formatting (for safer future uses if code changes)
-        echo '<p>' . esc_html($message) . '</p>';
+        echo '<p>' . esc_html($result['message']) . '</p>';
         echo '</div>';
+        if ($post_url) {
+            echo '<p>';
+            echo '<a href="' . esc_url($post_url) . '" target="_blank" class="button button-primary">';
+            echo 'Open Created Post';
+            echo '</a>';
+            echo '</p>';
+        }
 
         
     }
