@@ -40,12 +40,22 @@ def FetchTitleAndPara(url: str = Query(...)):
     # converts HTML into a structured data
     soup=BeautifulSoup(res.text,'html.parser')          
 
+    # for getting title of the news
     if soup.find("h1"):
         title = soup.find("h1").get_text(strip=True)
     elif soup.title:
         title = soup.title.get_text(strip=True)
     else:
         title = "No Title"
+
+
+    # for getting feautured image of the news
+    image_url = None
+
+    og_image = soup.find("meta", property="og:image")
+
+    if og_image:
+        image_url = og_image.get("content")
 
     # order in terms of priority (contents are mostly in one such tag) 
     possible_containers = [
@@ -105,5 +115,6 @@ def FetchTitleAndPara(url: str = Query(...)):
 
     return {
         "title": title,
-        "content": content
+        "content": content,
+        "image_url": image_url
     }
