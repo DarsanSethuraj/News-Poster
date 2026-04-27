@@ -11,6 +11,18 @@ import re
 
 app = FastAPI()
 
+def get_bbc_image(soup):
+    image_url=None
+    figure = soup.find("figure")
+
+    if figure:
+        img = figure.find("img")
+        if img:
+            image_url = img.get("src")
+            
+    return image_url
+    
+
 @app.get("/test")
 def test():
     return {"message": "Backend working 🚀"}
@@ -52,10 +64,16 @@ def FetchTitleAndPara(url: str = Query(...)):
     # for getting feautured image of the news
     image_url = None
 
-    og_image = soup.find("meta", property="og:image")
+    if "bbc.com" in url:    # only for BBC
+        image_url=get_bbc_image(soup)
 
-    if og_image:
-        image_url = og_image.get("content")
+    else:       # for every other site's image
+        og_image = soup.find("meta", property="og:image")
+
+        if og_image:
+            image_url = og_image.get("content")
+
+    
 
     # order in terms of priority (contents are mostly in one such tag) 
     possible_containers = [
@@ -86,7 +104,7 @@ def FetchTitleAndPara(url: str = Query(...)):
     "share this:",
     "related articles",
     "uncategorized",
-    "listen to the latest"
+    "listen to the latest",
     "additional reporting by"
     ] 
 
