@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi import Query
 import requests
 from bs4 import BeautifulSoup
+import re
 
 # cd "Backend-for-Auto-News-Post"
 # uvicorn main:app --reload
@@ -88,6 +89,7 @@ def FetchTitleAndPara(url: str = Query(...)):
 
         # gets the content inside the HTML tags
         text = para.get_text(" ", strip=True)
+        text = re.sub(r'\s+([.,!?;:])', r'\1', text)
 
         if not text:
             continue
