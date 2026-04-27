@@ -49,6 +49,8 @@ function rss_feed_test_page() {
         echo '</a>';
 
         echo '</li>';
+        backend_test($item->get_link());
+
     }
 
     echo '</ul>';
