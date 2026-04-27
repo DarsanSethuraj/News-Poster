@@ -12,16 +12,24 @@ import re
 app = FastAPI()
 
 def get_bbc_image(soup):
-    image_url=None
-    figure = soup.find("figure")
+    article = soup.find("article")
 
-    if figure:
-        img = figure.find("img")
-        if img:
-            image_url = img.get("src")
-            
-    return image_url
-    
+    if not article:
+        return None
+
+    imgs = article.find_all("img")
+
+    for img in imgs:
+        srcset = img.get("srcset")
+
+        if not srcset:
+            continue
+
+        last_candidate = srcset.split(",")[-1].strip()
+
+        return last_candidate.split()[0]
+
+    return None
 
 @app.get("/test")
 def test():
@@ -72,7 +80,6 @@ def FetchTitleAndPara(url: str = Query(...)):
 
         if og_image:
             image_url = og_image.get("content")
-
     
 
     # order in terms of priority (contents are mostly in one such tag) 
@@ -105,7 +112,10 @@ def FetchTitleAndPara(url: str = Query(...)):
     "related articles",
     "uncategorized",
     "listen to the latest",
-    "additional reporting by"
+    "additional reporting by",
+    "sign up here",
+    "our newsletter",
+    "royal watch newsletter"
     ] 
 
     content=""
