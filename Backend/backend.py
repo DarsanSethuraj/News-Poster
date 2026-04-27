@@ -87,6 +87,7 @@ def FetchTitleAndPara(url: str = Query(...)):
     "related articles",
     "uncategorized",
     "listen to the latest"
+    "additional reporting by"
     ] 
 
     content=""
