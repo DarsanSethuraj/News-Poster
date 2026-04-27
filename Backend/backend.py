@@ -87,7 +87,7 @@ def FetchTitleAndPara(url: str = Query(...)):
             continue
 
         # gets the content inside the HTML tags
-        text = para.get_text(strip=True)
+        text = para.get_text(" ", strip=True)
 
         if not text:
             continue
