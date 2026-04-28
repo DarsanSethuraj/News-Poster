@@ -3,6 +3,7 @@ from fastapi import Query
 import requests
 from bs4 import BeautifulSoup
 import re
+import json
 
 # cd "Backend-for-Auto-News-Post"
 # uvicorn main:app --reload
@@ -30,6 +31,83 @@ def get_bbc_image(soup):
         return last_candidate.split()[0]
 
     return None
+
+def get_news18_content(soup):
+    scripts = soup.find_all("script", type="application/ld+json")
+
+    for script in scripts:
+        try:
+            data = json.loads(script.string)
+
+            if isinstance(data, dict) and "articleBody" in data:
+                return data["articleBody"]
+
+        except:
+            continue
+
+    return None
+
+def parse_news18_html(soup,banned_phrases):
+    content = ""
+    seen = set()
+
+    start_tag = soup.find("figcaption")
+    # Intro paragraph(s) before lastpara blocks
+    intro_block = start_tag.find_next("div", string=lambda s: s and len(s.strip()) > 30)
+
+    intro_blocks = [intro_block] if intro_block else []
+    print("INTRO BLOCKS: ",intro_blocks)
+
+    # Main article blocks
+    article_blocks = soup.select("div.lastpara")
+    print("ARTICLE BLOCKS: ",article_blocks)
+
+    all_blocks = intro_blocks + article_blocks
+
+    for block in all_blocks:
+        text = block.get_text(" ", strip=True)
+
+        if not text:
+            continue
+
+        lower = text.lower()
+
+        if any(phrase in lower for phrase in banned_phrases):
+                continue
+
+        if lower.startswith("summary:"):
+            break
+
+        if lower == "advertisement":
+            continue
+
+        if "image credits:" in lower:
+            continue
+
+        if text in seen:
+            continue
+
+        seen.add(text)
+
+        # Embedded tweet
+        if block.find("blockquote", class_="twitter-tweet") or "pic.twitter.com" in text:
+            content += f"<blockquote>{text}</blockquote>"
+            continue
+
+        # Strong heading with body underneath
+        strong = block.find("strong")
+        if strong:
+            heading = strong.get_text(" ", strip=True)
+            content += f"<h3>{heading}</h3>"
+
+            remaining = text.replace(heading, "", 1).strip()
+            if remaining:
+                content += f"<p>{remaining}</p>"
+            continue
+
+        content += f"<p>{text}</p>"
+
+    return content if content else None
 
 @app.get("/test")
 def test():
@@ -89,6 +167,52 @@ def FetchTitleAndPara(url: str = Query(...)):
             image_url = og_image.get("content")
     
 
+    
+    # CREATE THE BANNED PHRASES IN LOWERCASE
+    GLOBAL_BANNED_PHRASES = [
+        "advertisement",
+        "read more",
+        "categories:",
+        "tags:",
+        "share this:",
+        "related articles",
+        "uncategorized",
+        "listen to the latest",
+        "additional reporting by",
+        "sign up here",
+        "our newsletter",
+        "royal watch newsletter",
+        "image credits:",
+        "image credit:",
+        "photo credit:",
+        "photo credits:"
+    ] 
+
+    ASIANET_BANNED_PHRASES = [
+        "asianet news",
+        "malayalam news"
+    ]
+
+    MANORAMA_BANNED_PHRASES = [
+        "ago"
+    ]
+
+    NEWS18_MALAYALAM_BANNED_PHRASES = [
+        "ഇതും വായിക്കുക"
+    ]
+
+    banned_phrases=GLOBAL_BANNED_PHRASES.copy()
+    
+    if "asianetnews.com" in url:
+        banned_phrases.extend(ASIANET_BANNED_PHRASES)
+
+    elif "manoramaonline.com" in url:
+        banned_phrases.extend(MANORAMA_BANNED_PHRASES)
+
+    elif "malayalam.news18.com" in url:
+        banned_phrases.extend(NEWS18_MALAYALAM_BANNED_PHRASES)
+
+
     # order in terms of priority (contents are mostly in one such tag) 
     possible_containers = [
     soup.find("article"),
@@ -109,68 +233,39 @@ def FetchTitleAndPara(url: str = Query(...)):
     else:
         paragraphs = soup.find_all("p")  
 
+
+    # for getting content out of news 18 malayalam
+    if "news18.com" in url:
+        content=parse_news18_html(soup,banned_phrases)
+
     
+    else:
+        content=""
+        # for eg: paragraph = [<p>First</p>, <p>Second</p>]
+        for para in paragraphs:   
 
-    # CREATE THE BANNED PHRASES IN LOWERCASE
-    GLOBAL_BANNED_PHRASES = [
-        "advertisement",
-        "read more",
-        "categories:",
-        "tags:",
-        "share this:",
-        "related articles",
-        "uncategorized",
-        "listen to the latest",
-        "additional reporting by",
-        "sign up here",
-        "our newsletter",
-        "royal watch newsletter",
-    ] 
+            # to remove image captions
+            if para.find_parent(["figure", "figcaption"]):
+                continue
 
-    ASIANET_BANNED_PHRASES = [
-        "asianet news",
-        "malayalam news"
-    ]
+            # gets the content inside the HTML tags
+            text = para.get_text(" ", strip=True)
+            text = re.sub(r'\s+([.,!?;:])', r'\1', text)
 
-    MANORAMA_BANNED_PHRASES = [
-        "ago"
-    ]
+            if not text:
+                continue
 
-    banned_phrases=GLOBAL_BANNED_PHRASES.copy()
-    
-    if "asianetnews.com" in url:
-        banned_phrases.extend(ASIANET_BANNED_PHRASES)
+            #if para has less than 10 characters
+            if len(text) < 10:
+                continue
 
-    elif "manoramaonline.com" in url:
-        banned_phrases.extend(MANORAMA_BANNED_PHRASES)
+            lower_text = text.lower()
+            
 
-
-    content=""
-    # for eg: paragraph = [<p>First</p>, <p>Second</p>]
-    for para in paragraphs:   
-
-        # to remove image captions
-        if para.find_parent(["figure", "figcaption"]):
-            continue
-
-        # gets the content inside the HTML tags
-        text = para.get_text(" ", strip=True)
-        text = re.sub(r'\s+([.,!?;:])', r'\1', text)
-
-        if not text:
-            continue
-
-        #if para has less than 10 characters
-        if len(text) < 10:
-            continue
-
-        lower_text = text.lower()
+            if any(phrase in lower_text for phrase in banned_phrases):
+                continue
         
-
-        if any(phrase in lower_text for phrase in banned_phrases):
-            continue
-    
-        content += f"<p>{text}</p>"
+            content += f"<p>{text}</p>"
 
     return {
         "title": title,
