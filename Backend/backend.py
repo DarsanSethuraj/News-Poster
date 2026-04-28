@@ -235,7 +235,7 @@ def FetchTitleAndPara(url: str = Query(...)):
 
 
     # for getting content out of news 18 malayalam
-    if "news18.com" in url:
+    if "malayalam.news18.com" in url:
         content=parse_news18_html(soup,banned_phrases)
 
     
