@@ -32,7 +32,7 @@ def get_bbc_image(soup):
 
     return None
 
-def get_news18_content(soup):
+def get_news18_content(soup):  # turns everything into paragraph
     scripts = soup.find_all("script", type="application/ld+json")
 
     for script in scripts:
@@ -48,6 +48,7 @@ def get_news18_content(soup):
     return None
 
 def parse_news18_html(soup,banned_phrases):
+
     content = ""
     seen = set()
 
@@ -89,23 +90,47 @@ def parse_news18_html(soup,banned_phrases):
 
         seen.add(text)
 
-        # Embedded tweet
-        if block.find("blockquote", class_="twitter-tweet") or "pic.twitter.com" in text:
-            content += f"<blockquote>{text}</blockquote>"
+        content+=str(block)
+
+    return content if content else None
+
+def parse_asianet_html(soup, banned_phrases):
+    article_body = soup.find("div", itemprop="articleBody")
+
+    if not article_body:
+        return None
+
+    story_section = article_body.find(
+        "section",
+        id=lambda x: x and x.startswith("story_")
+    )
+
+    if not story_section:
+        return None
+
+    content = ""
+    seen = set()
+
+    for child in story_section.find_all(recursive=False):
+
+        text = child.get_text(" ", strip=True)
+
+        if not text:
             continue
 
-        # Strong heading with body underneath
-        strong = block.find("strong")
-        if strong:
-            heading = strong.get_text(" ", strip=True)
-            content += f"<h3>{heading}</h3>"
+        lower = text.lower()
 
-            remaining = text.replace(heading, "", 1).strip()
-            if remaining:
-                content += f"<p>{remaining}</p>"
+        # Stop at promo/footer
+        if any(phrase in lower for phrase in banned_phrases):
+            break
+
+        # Skip duplicates
+        if text in seen:
             continue
+        seen.add(text)
 
-        content += f"<p>{text}</p>"
+        # Instagram Embed
+        content += str(child)
 
     return content if content else None
 
@@ -190,7 +215,8 @@ def FetchTitleAndPara(url: str = Query(...)):
 
     ASIANET_BANNED_PHRASES = [
         "asianet news",
-        "malayalam news"
+        "malayalam news",
+        "ഏഷ്യാനെറ്റ് ന്യൂസ് ലൈവ്"
     ]
 
     MANORAMA_BANNED_PHRASES = [
@@ -233,9 +259,11 @@ def FetchTitleAndPara(url: str = Query(...)):
     else:
         paragraphs = soup.find_all("p")  
 
+    if "asianetnews.com" in url:
+        content = parse_asianet_html(soup,banned_phrases)
 
     # for getting content out of news 18 malayalam
-    if "malayalam.news18.com" in url:
+    elif "malayalam.news18.com" in url:
         content=parse_news18_html(soup,banned_phrases)
 
     
